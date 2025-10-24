@@ -3,10 +3,11 @@ kind: Service
 metadata:
   name: ticket-booking-service
 spec:
-  type: LoadBalancer
+  type: NodePort   # Change this from LoadBalancer
   selector:
     app: ticket-booking
   ports:
     - protocol: TCP
-      port: 80
+      port: 80       # Internal port
       targetPort: 5000
+      nodePort: 30080  # Port you will access on localhost
