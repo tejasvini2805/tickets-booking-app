@@ -1,3 +1,5 @@
+def dockerImage  // Declare globally to avoid memory leak warning
+
 pipeline {
     agent any
 
@@ -15,6 +17,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
+                    // Build Docker image using the build number as tag
                     dockerImage = docker.build("${DOCKER_HUB_REPO}:${BUILD_NUMBER}")
                 }
             }
@@ -23,10 +26,10 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    // ← This is where you add it
+                    // Make sure 'dockerhub-credentials' contains Username=tejasvini2805 and Password=PAT
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-                        dockerImage.push()
-                        dockerImage.push('latest')
+                        dockerImage.push()       // Push with build number tag
+                        dockerImage.push('latest') // Push latest tag
                     }
                 }
             }
@@ -34,9 +37,27 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                sh 'kubectl apply -f k8s-deployment.yaml'
-                sh 'kubectl apply -f k8s-service.yaml'
+                // Windows agent requires 'bat' instead of 'sh'
+                bat 'kubectl apply -f k8s-deployment.yaml'
+                bat 'kubectl apply -f k8s-service.yaml'
             }
+        }
+    }
+
+    post {
+        always {
+            echo "Cleaning up local Docker images..."
+            script {
+                // Remove local image after push to save space
+                bat "docker rmi ${DOCKER_HUB_REPO}:${BUILD_NUMBER}"
+                bat "docker rmi ${DOCKER_HUB_REPO}:latest"
+            }
+        }
+        failure {
+            echo "Pipeline failed! Check logs."
+        }
+        success {
+            echo "Pipeline completed successfully!"
         }
     }
 }
